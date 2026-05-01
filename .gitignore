@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Virtual env
+.venv/
+venv/
+
+# Qdrant 本地存储（运行时数据，不入版本库）
+data/qdrant/
+data/qdrant_local/
+
+# IDE / 工具
+.qoder/
+.idea/
+.vscode/
+
+# 临时文件
+*.zip
+*.log

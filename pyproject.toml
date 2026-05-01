@@ -3,6 +3,11 @@ name = "knowledge-mcp"
 version = "0.1.0"
 description = "Personal dev knowledge base with MCP interface"
 requires-python = ">=3.10"
+# 依赖版本已锁定，请勿随意升级。历史陷阱：
+#   - numpy>=2 会和 pyarrow<16 的 ABI 冲突，触发 0xC0000005 AV
+#   - pyarrow>=16 和 datasets<3 的 pa.json_() API 不兼容
+#   - transformers>=5 会要求 huggingface-hub>=1，打破 sentence-transformers
+# 详情参考 drafts/_committed/20260501-050000_embedding依赖链路修复全记录.md
 dependencies = [
     "mcp>=1.0.0",
     "qdrant-client>=1.12.0",
@@ -10,6 +15,13 @@ dependencies = [
     "torch>=2.0.0",
     "pydantic>=2.0.0",
     "python-frontmatter>=1.1.0",
+    # 锁定范围（防止 transitive 重新拉到冲突版）
+    "transformers>=4.57,<5.0",
+    "huggingface-hub>=0.34,<1.0",
+    "sentence-transformers>=5.0,<6.0",
+    "numpy<2",
+    "pyarrow==15.0.2",
+    "datasets>=2.21,<3.0",
 ]
 
 [project.scripts]

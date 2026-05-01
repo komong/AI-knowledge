@@ -49,19 +49,23 @@ def parse_draft(filepath: Path) -> Memory:
 
 
 def _extract_section(body: str, header: str) -> str:
-    """从 markdown 中提取 # header 之后到下一个 # 之前的内容。"""
+    """从 markdown 中提取 `# header` 之后到下一个一级 `# ` 前的内容。
+
+    只以一级标题（`# ` 开头）作为切分点；`##` 及更深级别归为当前 section 内容。
+    """
     lines = body.splitlines()
     capturing = False
     captured: list[str] = []
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("#"):
+        is_h1 = stripped.startswith("# ")
+        if is_h1:
             if capturing:
                 break
             if header in stripped:
                 capturing = True
-                continue
-        elif capturing:
+            continue
+        if capturing:
             captured.append(line)
     text = "\n".join(captured).strip()
     return "" if text == "_(未填写)_" else text

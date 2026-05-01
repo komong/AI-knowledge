@@ -11,6 +11,7 @@ Schema 设计（针对多语言开发场景）:
 """
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -60,8 +61,24 @@ class Memory(BaseModel):
 
 
 class Store:
-    def __init__(self, url: str = "http://localhost:6333"):
-        self.client = QdrantClient(url=url)
+    def __init__(self, url: str | None = None):
+        """初始化 Qdrant 客户端。
+
+        连接优先级：
+        1. 显式传入 url
+        2. 环境变量 QDRANT_URL（远程 HTTP）
+        3. 环境变量 QDRANT_PATH（本地文件模式，完全无网络）
+        4. 默认走本地文件模式 ./data/qdrant
+        本地模式规避了 Windows ↔ WSL localhost 转发不稳的问题。
+        """
+        url = url or os.getenv("QDRANT_URL")
+        if url:
+            self.client = QdrantClient(url=url)
+        else:
+            path = os.getenv("QDRANT_PATH") or str(
+                (__import__("pathlib").Path(__file__).resolve().parent.parent / "data" / "qdrant_local")
+            )
+            self.client = QdrantClient(path=path)
         self._ensure_collection()
 
     def _ensure_collection(self) -> None:
