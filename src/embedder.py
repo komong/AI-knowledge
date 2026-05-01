@@ -19,8 +19,9 @@ EMBED_DIM = 1024
 
 @lru_cache(maxsize=1)
 def _get_model() -> BGEM3FlagModel:
-    # use_fp16=True 可以省一半显存且几乎无精度损失；纯 CPU 也能跑，只是慢一些
-    return BGEM3FlagModel(MODEL_NAME, use_fp16=True)
+    import torch
+    use_fp16 = torch.cuda.is_available()
+    return BGEM3FlagModel(MODEL_NAME, use_fp16=use_fp16)
 
 
 def embed_texts(texts: List[str]) -> List[List[float]]:

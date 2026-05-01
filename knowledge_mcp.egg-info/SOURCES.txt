@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+knowledge_mcp.egg-info/PKG-INFO
+knowledge_mcp.egg-info/SOURCES.txt
+knowledge_mcp.egg-info/dependency_links.txt
+knowledge_mcp.egg-info/entry_points.txt
+knowledge_mcp.egg-info/requires.txt
+knowledge_mcp.egg-info/top_level.txt

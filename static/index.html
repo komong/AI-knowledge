@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Knowledge — 开发经验复利库</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .tab-active { background: #18181b; color: white; }
+    .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; margin-right: 4px; }
+    .pill-lang { background: #dbeafe; color: #1e40af; }
+    .pill-tag { background: #fef3c7; color: #92400e; }
+    .score-bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+    .score-fill { height: 100%; background: linear-gradient(90deg, #34d399, #10b981); }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    .editor { font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace; font-size: 13px; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<div class="max-w-6xl mx-auto px-6 py-8">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold">Knowledge</h1>
+      <p class="text-sm text-gray-500">开发经验复利库</p>
+    </div>
+    <div id="stats" class="flex gap-6 text-sm">
+      <div><span class="text-gray-500">已入库</span> <span id="stat-indexed" class="font-semibold ml-1">—</span></div>
+      <div><span class="text-gray-500">待审核</span> <span id="stat-pending" class="font-semibold ml-1 text-amber-600">—</span></div>
+      <div><span class="text-gray-500">已归档</span> <span id="stat-committed" class="font-semibold ml-1">—</span></div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="flex gap-2 mb-6 border-b border-gray-200">
+    <button data-tab="search" class="tab px-4 py-2 text-sm font-medium rounded-t">搜索</button>
+    <button data-tab="drafts" class="tab px-4 py-2 text-sm font-medium rounded-t">草稿审核 <span id="drafts-badge" class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 hidden"></span></button>
+    <button data-tab="memories" class="tab px-4 py-2 text-sm font-medium rounded-t">已入库浏览</button>
+  </nav>
+
+  <!-- Search Tab -->
+  <section id="tab-search" class="tab-panel">
+    <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <div class="flex gap-2">
+        <input id="q" type="text" placeholder="自然语言描述你的问题，比如「Python asyncio cancel 后清理资源」"
+               class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input id="q-lang" type="text" placeholder="语言（可选）" class="w-32 px-3 py-2 border border-gray-300 rounded text-sm" />
+        <input id="q-tag" type="text" placeholder="标签（可选）" class="w-32 px-3 py-2 border border-gray-300 rounded text-sm" />
+        <button id="btn-search" class="px-5 py-2 bg-black text-white text-sm rounded hover:bg-gray-800">搜索</button>
+      </div>
+    </div>
+    <div id="search-results" class="space-y-3"></div>
+  </section>
+
+  <!-- Drafts Tab -->
+  <section id="tab-drafts" class="tab-panel hidden">
+    <div class="flex justify-between items-center mb-4">
+      <p class="text-sm text-gray-600">审核草稿，确认无误后入库。建议保持低于 20 条。</p>
+      <button id="btn-commit-all" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded hover:bg-emerald-700">全部入库</button>
+    </div>
+    <div id="drafts-list" class="space-y-3"></div>
+  </section>
+
+  <!-- Memories Tab -->
+  <section id="tab-memories" class="tab-panel hidden">
+    <p class="text-sm text-gray-600 mb-4">浏览所有已入库内容（分页）</p>
+    <div id="memories-list" class="space-y-3"></div>
+    <div id="memories-pager" class="mt-6 flex justify-center gap-2"></div>
+  </section>
+
+</div>
+
+<!-- Edit Modal -->
+<div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div class="flex items-center justify-between px-5 py-3 border-b">
+      <h3 id="modal-title" class="font-semibold">编辑草稿</h3>
+      <button id="modal-close" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div class="p-5 flex-1 overflow-auto">
+      <textarea id="modal-content" class="editor w-full h-96 p-3 border border-gray-300 rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <p class="text-xs text-gray-500 mt-2">提示：保留 frontmatter（--- 之间的 YAML），改完点保存</p>
+    </div>
+    <div class="px-5 py-3 border-t flex justify-end gap-2">
+      <button id="modal-cancel" class="px-4 py-2 text-sm border rounded">取消</button>
+      <button id="modal-save" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 right-6 hidden bg-gray-900 text-white px-4 py-2 rounded shadow-lg text-sm"></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function toast(msg, type = "info") {
+  const el = $("#toast");
+  el.textContent = msg;
+  el.className = "fixed bottom-6 right-6 px-4 py-2 rounded shadow-lg text-sm " +
+    (type === "error" ? "bg-red-600 text-white" : type === "ok" ? "bg-emerald-600 text-white" : "bg-gray-900 text-white");
+  el.classList.remove("hidden");
+  setTimeout(() => el.classList.add("hidden"), 2500);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+function renderPills(arr, cls) {
+  return (arr || []).map(t => `<span class="pill ${cls}">${escapeHtml(t)}</span>`).join("");
+}
+
+// ───────── Tabs ─────────
+function showTab(name) {
+  $$(".tab-panel").forEach(p => p.classList.add("hidden"));
+  $(`#tab-${name}`).classList.remove("hidden");
+  $$(".tab").forEach(t => t.classList.remove("tab-active"));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add("tab-active");
+  if (name === "drafts") loadDrafts();
+  if (name === "memories") loadMemories(0);
+}
+$$(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+// ───────── Stats ─────────
+async function loadStats() {
+  try {
+    const s = await api("/api/stats");
+    $("#stat-indexed").textContent = s.indexed;
+    $("#stat-pending").textContent = s.drafts_pending;
+    $("#stat-committed").textContent = s.drafts_committed;
+    const badge = $("#drafts-badge");
+    if (s.drafts_pending > 0) {
+      badge.textContent = s.drafts_pending;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  } catch (e) { toast("加载统计失败: " + e.message, "error"); }
+}
+
+// ───────── Search ─────────
+async function doSearch() {
+  const q = $("#q").value.trim();
+  if (!q) return;
+  const params = new URLSearchParams({ q });
+  if ($("#q-lang").value.trim()) params.set("lang", $("#q-lang").value.trim());
+  if ($("#q-tag").value.trim()) params.set("tag", $("#q-tag").value.trim());
+
+  $("#search-results").innerHTML = `<div class="text-center text-gray-400 py-8">搜索中...</div>`;
+  try {
+    const data = await api("/api/search?" + params);
+    if (!data.results.length) {
+      $("#search-results").innerHTML = `<div class="text-center text-gray-400 py-8">没有相关结果</div>`;
+      return;
+    }
+    $("#search-results").innerHTML = data.results.map(r => `
+      <article class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-medium flex-1 mr-3">${escapeHtml(r.problem)}</h3>
+          <div class="text-xs text-gray-500 whitespace-nowrap">分数 ${r.score}</div>
+        </div>
+        <div class="score-bar mb-2"><div class="score-fill" style="width: ${Math.min(r.score * 100, 100)}%"></div></div>
+        ${r.context ? `<p class="text-xs text-gray-500 mb-2">场景: ${escapeHtml(r.context)}</p>` : ""}
+        <pre class="text-sm text-gray-700 mb-3">${escapeHtml(r.solution)}</pre>
+        <div class="flex justify-between items-center">
+          <div>${renderPills(r.languages, "pill-lang")}${renderPills(r.tags, "pill-tag")}</div>
+          <button data-id="${r.id}" class="btn-del-mem text-xs text-red-500 hover:text-red-700">删除</button>
+        </div>
+      </article>
+    `).join("");
+    $$(".btn-del-mem").forEach(b => b.addEventListener("click", async (e) => {
+      if (!confirm("确认删除这条记忆？")) return;
+      await api(`/api/memories/${e.target.dataset.id}`, { method: "DELETE" });
+      toast("已删除", "ok");
+      doSearch();
+      loadStats();
+    }));
+  } catch (e) { toast("搜索失败: " + e.message, "error"); }
+}
+$("#btn-search").addEventListener("click", doSearch);
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+
+// ───────── Drafts ─────────
+async function loadDrafts() {
+  const list = $("#drafts-list");
+  list.innerHTML = `<div class="text-center text-gray-400 py-8">加载中...</div>`;
+  try {
+    const data = await api("/api/drafts");
+    if (!data.items.length) {
+      list.innerHTML = `<div class="text-center text-gray-400 py-12">没有待审核的草稿 ✨</div>`;
+      return;
+    }
+    list.innerHTML = data.items.map(d => `
+      <article class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-medium flex-1 mr-3">${escapeHtml(d.problem || d.filename)}</h3>
+          <span class="text-xs text-gray-400 whitespace-nowrap">${escapeHtml((d.created_at || "").slice(0, 19).replace("T", " "))}</span>
+        </div>
+        <div class="mb-3">${renderPills(d.languages, "pill-lang")}${renderPills(d.tags, "pill-tag")}</div>
+        <div class="flex gap-2">
+          <button data-fn="${escapeHtml(d.filename)}" class="btn-edit px-3 py-1 text-xs border rounded hover:bg-gray-50">编辑</button>
+          <button data-fn="${escapeHtml(d.filename)}" class="btn-commit px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700">入库</button>
+          <button data-fn="${escapeHtml(d.filename)}" class="btn-del-draft px-3 py-1 text-xs text-red-500 hover:bg-red-50 rounded">丢弃</button>
+          <span class="ml-auto text-xs text-gray-400 self-center">${escapeHtml(d.filename)}</span>
+        </div>
+      </article>
+    `).join("");
+
+    $$(".btn-edit").forEach(b => b.addEventListener("click", () => openEditor(b.dataset.fn)));
+    $$(".btn-commit").forEach(b => b.addEventListener("click", async () => {
+      try {
+        await api(`/api/drafts/${encodeURIComponent(b.dataset.fn)}/commit`, { method: "POST" });
+        toast("入库成功", "ok");
+        loadDrafts(); loadStats();
+      } catch (e) { toast("入库失败: " + e.message, "error"); }
+    }));
+    $$(".btn-del-draft").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("确认丢弃这条草稿？")) return;
+      await api(`/api/drafts/${encodeURIComponent(b.dataset.fn)}`, { method: "DELETE" });
+      toast("已丢弃", "ok");
+      loadDrafts(); loadStats();
+    }));
+  } catch (e) { toast("加载草稿失败: " + e.message, "error"); }
+}
+
+$("#btn-commit-all").addEventListener("click", async () => {
+  if (!confirm("把所有草稿都入库？")) return;
+  try {
+    const r = await api("/api/drafts/commit-all", { method: "POST" });
+    toast(`入库 ${r.committed} 条${r.errors.length ? `，${r.errors.length} 条失败` : ""}`, "ok");
+    loadDrafts(); loadStats();
+  } catch (e) { toast("批量入库失败: " + e.message, "error"); }
+});
+
+// ───────── Editor Modal ─────────
+let currentEditingFile = null;
+
+async function openEditor(filename) {
+  try {
+    const data = await api(`/api/drafts/${encodeURIComponent(filename)}`);
+    currentEditingFile = filename;
+    $("#modal-title").textContent = "编辑：" + filename;
+    $("#modal-content").value = data.content;
+    $("#modal").classList.remove("hidden");
+    $("#modal").classList.add("flex");
+  } catch (e) { toast("打开失败: " + e.message, "error"); }
+}
+
+function closeEditor() {
+  $("#modal").classList.add("hidden");
+  $("#modal").classList.remove("flex");
+  currentEditingFile = null;
+}
+
+$("#modal-close").addEventListener("click", closeEditor);
+$("#modal-cancel").addEventListener("click", closeEditor);
+$("#modal-save").addEventListener("click", async () => {
+  if (!currentEditingFile) return;
+  try {
+    await api(`/api/drafts/${encodeURIComponent(currentEditingFile)}`, {
+      method: "PUT",
+      body: JSON.stringify({ content: $("#modal-content").value }),
+    });
+    toast("已保存", "ok");
+    closeEditor();
+    loadDrafts();
+  } catch (e) { toast("保存失败: " + e.message, "error"); }
+});
+
+// ───────── Memories ─────────
+async function loadMemories(offset = 0) {
+  const limit = 20;
+  const list = $("#memories-list");
+  list.innerHTML = `<div class="text-center text-gray-400 py-8">加载中...</div>`;
+  try {
+    const data = await api(`/api/memories?offset=${offset}&limit=${limit}`);
+    if (!data.items.length) {
+      list.innerHTML = `<div class="text-center text-gray-400 py-12">还没有入库的记忆</div>`;
+      $("#memories-pager").innerHTML = "";
+      return;
+    }
+    list.innerHTML = data.items.map(m => `
+      <article class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-medium flex-1 mr-3">${escapeHtml(m.problem)}</h3>
+          <span class="text-xs text-gray-400 whitespace-nowrap">${escapeHtml((m.created_at || "").slice(0, 10))}</span>
+        </div>
+        ${m.context ? `<p class="text-xs text-gray-500 mb-2">场景: ${escapeHtml(m.context)}</p>` : ""}
+        <pre class="text-sm text-gray-700 mb-3">${escapeHtml(m.solution)}</pre>
+        <div class="flex justify-between items-center">
+          <div>${renderPills(m.languages, "pill-lang")}${renderPills(m.tags, "pill-tag")}</div>
+          <button data-id="${m.id}" class="btn-del-mem text-xs text-red-500 hover:text-red-700">删除</button>
+        </div>
+      </article>
+    `).join("");
+
+    // 分页
+    const total = data.total;
+    const pages = Math.ceil(total / limit);
+    const cur = Math.floor(offset / limit);
+    let pager = "";
+    for (let i = 0; i < pages; i++) {
+      pager += `<button data-off="${i * limit}" class="btn-page px-3 py-1 text-sm rounded ${i === cur ? "bg-black text-white" : "bg-white border"}">${i + 1}</button>`;
+    }
+    $("#memories-pager").innerHTML = pager;
+    $$(".btn-page").forEach(b => b.addEventListener("click", () => loadMemories(parseInt(b.dataset.off))));
+
+    $$(".btn-del-mem").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("确认删除这条记忆？")) return;
+      await api(`/api/memories/${b.dataset.id}`, { method: "DELETE" });
+      toast("已删除", "ok");
+      loadMemories(offset); loadStats();
+    }));
+  } catch (e) { toast("加载失败: " + e.message, "error"); }
+}
+
+// ───────── 启动 ─────────
+loadStats();
+showTab("search");
+setInterval(loadStats, 10000); // 每 10s 刷新一次统计
+</script>
+</body>
+</html>

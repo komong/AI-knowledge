@@ -1,0 +1,4 @@
+[console_scripts]
+knowledge-commit = scripts.commit:main
+knowledge-mcp = src.server:main
+knowledge-reindex = scripts.reindex:main

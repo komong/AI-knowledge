@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/__init__.py
+src/embedder.py
+src/server.py
+src/store.py
+src/knowledge_mcp.egg-info/PKG-INFO
+src/knowledge_mcp.egg-info/SOURCES.txt
+src/knowledge_mcp.egg-info/dependency_links.txt
+src/knowledge_mcp.egg-info/entry_points.txt
+src/knowledge_mcp.egg-info/requires.txt
+src/knowledge_mcp.egg-info/top_level.txt
