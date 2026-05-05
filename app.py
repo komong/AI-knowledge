@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.commit import parse_draft  # noqa: E402
 from src.store import COLLECTION, Store  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 DRAFTS_DIR = Path(os.getenv("KNOWLEDGE_DRAFTS_DIR", ROOT / "drafts"))
 ARCHIVE_DIR = DRAFTS_DIR / "_committed"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -48,7 +48,9 @@ _store: Optional[Store] = None
 def get_store() -> Store:
     global _store
     if _store is None:
-        _store = Store(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        # 空字符串或未设置则走本地文件模式，与 server.py 保持一致
+        url = os.getenv("QDRANT_URL")
+        _store = Store(url=url if url else None)
     return _store
 
 
@@ -165,11 +167,13 @@ def update_draft(filename: str, payload: DraftPayload):
 
 
 @app.delete("/api/drafts/{filename}")
-def delete_draft(filename: str):
+def delete_draft(filename: str, reason: str = ""):
     p = _safe_draft_path(filename)
     if not p.exists():
         raise HTTPException(404, "草稿不存在")
     p.unlink()
+    if reason:
+        print(f"[discard] {filename} — {reason}")
     return {"status": "deleted"}
 
 

@@ -5,6 +5,7 @@
   <title>Knowledge — 开发经验复利库</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
     .tab-active { background: #18181b; color: white; }
@@ -15,6 +16,36 @@
     .score-fill { height: 100%; background: linear-gradient(90deg, #34d399, #10b981); }
     pre { white-space: pre-wrap; word-break: break-word; }
     .editor { font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace; font-size: 13px; }
+    /* ── Modal Tabs ── */
+    .modal-tab { cursor: pointer; transition: all .15s; }
+    .modal-tab-active { background: #18181b; color: white; }
+    /* ── Markdown Preview ── */
+    .md-preview { line-height: 1.75; color: #1f2937; }
+    .md-preview h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #e5e7eb; }
+    .md-preview h2 { font-size: 1.2rem; font-weight: 600; margin: 1.2rem 0 0.5rem; }
+    .md-preview h3 { font-size: 1.05rem; font-weight: 600; margin: 1rem 0 0.4rem; }
+    .md-preview p { margin: 0.5rem 0; }
+    .md-preview ul, .md-preview ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+    .md-preview li { margin: 0.25rem 0; }
+    .md-preview code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace; }
+    .md-preview pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85em; line-height: 1.5; margin: 0.75rem 0; }
+    .md-preview pre code { background: none; padding: 0; font-size: inherit; }
+    .md-preview blockquote { border-left: 3px solid #d1d5db; padding-left: 1rem; margin: 0.75rem 0; color: #6b7280; }
+    .md-preview a { color: #2563eb; text-decoration: underline; }
+    .md-preview hr { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+    .md-preview table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+    .md-preview th, .md-preview td { border: 1px solid #e5e7eb; padding: 0.4rem 0.75rem; text-align: left; }
+    .md-preview th { background: #f9fafb; font-weight: 600; }
+    /* ── Frontmatter Card ── */
+    .fm-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+    .fm-card .fm-row { display: flex; align-items: baseline; gap: 0.5rem; font-size: 13px; margin: 2px 0; }
+    .fm-card .fm-key { color: #6b7280; min-width: 4rem; }
+    .fm-card .fm-val { color: #1f2937; font-weight: 500; }
+    /* ── Fullscreen Modal ── */
+    #modal.fullscreen { padding: 0; }
+    #modal.fullscreen .modal-inner { max-width: 100vw !important; max-height: 100vh !important; border-radius: 0; }
+    /* ── Discard Dialog ── */
+    .discard-dialog { max-width: 420px; }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
@@ -73,20 +104,56 @@
 
 </div>
 
-<!-- Edit Modal -->
+<!-- Edit/Preview Modal -->
 <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+  <div class="modal-inner bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
     <div class="flex items-center justify-between px-5 py-3 border-b">
-      <h3 id="modal-title" class="font-semibold">编辑草稿</h3>
-      <button id="modal-close" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+      <div class="flex items-center gap-4">
+        <h3 id="modal-title" class="font-semibold">草稿详情</h3>
+        <div class="flex gap-0.5 bg-gray-100 rounded p-0.5">
+          <button id="modal-tab-preview" class="modal-tab modal-tab-active px-3 py-1 text-xs rounded-sm font-medium">预览</button>
+          <button id="modal-tab-edit" class="modal-tab px-3 py-1 text-xs rounded-sm font-medium">编辑</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-1">
+        <button id="modal-fullscreen" class="text-gray-400 hover:text-gray-700 p-1 leading-none" title="全屏">
+          <svg id="fs-icon-expand" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          <svg id="fs-icon-collapse" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><polyline points="4 8 4 3 9 3"/><polyline points="20 16 20 21 15 21"/><line x1="4" y1="3" x2="11" y2="10"/><line x1="20" y1="21" x2="13" y2="14"/></svg>
+        </button>
+        <button id="modal-close" class="text-gray-400 hover:text-gray-700 text-2xl leading-none p-1">&times;</button>
+      </div>
     </div>
-    <div class="p-5 flex-1 overflow-auto">
+    <!-- Preview Panel -->
+    <div id="modal-preview" class="p-5 flex-1 overflow-auto">
+      <div id="modal-preview-meta"></div>
+      <div id="modal-preview-body" class="md-preview"></div>
+    </div>
+    <!-- Edit Panel -->
+    <div id="modal-edit" class="p-5 flex-1 overflow-auto hidden">
       <textarea id="modal-content" class="editor w-full h-96 p-3 border border-gray-300 rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
       <p class="text-xs text-gray-500 mt-2">提示：保留 frontmatter（--- 之间的 YAML），改完点保存</p>
     </div>
     <div class="px-5 py-3 border-t flex justify-end gap-2">
       <button id="modal-cancel" class="px-4 py-2 text-sm border rounded">取消</button>
       <button id="modal-save" class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discard Confirm Dialog -->
+<div id="discard-dialog" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[60] p-4">
+  <div class="bg-white rounded-lg shadow-xl w-full discard-dialog">
+    <div class="px-5 py-3 border-b">
+      <h3 class="font-semibold">丢弃草稿</h3>
+    </div>
+    <div class="p-5">
+      <p id="discard-dialog-filename" class="text-sm text-gray-600 mb-3"></p>
+      <label class="block text-xs text-gray-500 mb-1">丢弃原因（非必填）</label>
+      <textarea id="discard-reason" class="w-full p-2 border border-gray-300 rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-400" rows="3" placeholder="例如：内容重复、不再需要..."></textarea>
+    </div>
+    <div class="px-5 py-3 border-t flex justify-end gap-2">
+      <button id="discard-cancel" class="px-4 py-2 text-sm border rounded">取消</button>
+      <button id="discard-confirm" class="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700">确认丢弃</button>
     </div>
   </div>
 </div>
@@ -233,12 +300,7 @@ async function loadDrafts() {
         loadDrafts(); loadStats();
       } catch (e) { toast("入库失败: " + e.message, "error"); }
     }));
-    $$(".btn-del-draft").forEach(b => b.addEventListener("click", async () => {
-      if (!confirm("确认丢弃这条草稿？")) return;
-      await api(`/api/drafts/${encodeURIComponent(b.dataset.fn)}`, { method: "DELETE" });
-      toast("已丢弃", "ok");
-      loadDrafts(); loadStats();
-    }));
+    $$(".btn-del-draft").forEach(b => b.addEventListener("click", () => openDiscardDialog(b.dataset.fn)));
   } catch (e) { toast("加载草稿失败: " + e.message, "error"); }
 }
 
@@ -253,13 +315,78 @@ $("#btn-commit-all").addEventListener("click", async () => {
 
 // ───────── Editor Modal ─────────
 let currentEditingFile = null;
+let currentRawContent = "";
+
+// 配置 marked
+marked.setOptions({ breaks: true, gfm: true });
+
+/** 解析 markdown：拆分 frontmatter YAML 和正文 */
+function parseFrontmatter(content) {
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!m) return { meta: {}, body: content };
+  const meta = {};
+  m[1].split(/\r?\n/).forEach(line => {
+    const idx = line.indexOf(":");
+    if (idx === -1) return;
+    const key = line.slice(0, idx).trim();
+    let val = line.slice(idx + 1).trim();
+    // 尝试 JSON 解析数组值，如 ["python", "go"]
+    try { val = JSON.parse(val); } catch (_) { /* keep as string */ }
+    if (Array.isArray(val)) {
+      meta[key] = val.join(", ");
+    } else {
+      meta[key] = String(val).replace(/^"|"$/g, "");
+    }
+  });
+  return { meta, body: m[2] };
+}
+
+/** 渲染预览：元数据卡片 + markdown 正文 */
+function renderPreview(content) {
+  const { meta, body } = parseFrontmatter(content);
+  currentRawContent = content;
+
+  // 元数据卡片
+  const labels = { problem: "问题", languages: "语言", tags: "标签", created_at: "创建", status: "状态" };
+  const rows = Object.entries(labels)
+    .filter(([k]) => meta[k])
+    .map(([k, label]) => `<div class="fm-row"><span class="fm-key">${label}</span><span class="fm-val">${escapeHtml(meta[k])}</span></div>`)
+    .join("");
+  $("#modal-preview-meta").innerHTML = rows ? `<div class="fm-card">${rows}</div>` : "";
+
+  // 正文渲染
+  $("#modal-preview-body").innerHTML = marked.parse(body);
+}
+
+/** 切换预览 / 编辑 Tab */
+function switchModalTab(tab) {
+  const isPreview = tab === "preview";
+  $("#modal-preview").classList.toggle("hidden", !isPreview);
+  $("#modal-edit").classList.toggle("hidden", isPreview);
+  $("#modal-tab-preview").classList.toggle("modal-tab-active", isPreview);
+  $("#modal-tab-edit").classList.toggle("modal-tab-active", !isPreview);
+  // 切换到编辑时，同步最新内容到 textarea
+  if (!isPreview) {
+    $("#modal-content").value = currentRawContent;
+  }
+  // 切换到预览时，用 textarea 内容刷新预览
+  if (isPreview) {
+    renderPreview($("#modal-content").value);
+  }
+}
+
+$("#modal-tab-preview").addEventListener("click", () => switchModalTab("preview"));
+$("#modal-tab-edit").addEventListener("click", () => switchModalTab("edit"));
 
 async function openEditor(filename) {
   try {
     const data = await api(`/api/drafts/${encodeURIComponent(filename)}`);
     currentEditingFile = filename;
-    $("#modal-title").textContent = "编辑：" + filename;
+    $("#modal-title").textContent = "草稿：" + filename;
     $("#modal-content").value = data.content;
+    // 默认打开预览模式
+    renderPreview(data.content);
+    switchModalTab("preview");
     $("#modal").classList.remove("hidden");
     $("#modal").classList.add("flex");
   } catch (e) { toast("打开失败: " + e.message, "error"); }
@@ -268,22 +395,72 @@ async function openEditor(filename) {
 function closeEditor() {
   $("#modal").classList.add("hidden");
   $("#modal").classList.remove("flex");
+  // 重置全屏状态
+  if (isFullscreen) {
+    isFullscreen = false;
+    $("#modal").classList.remove("fullscreen");
+    $("#fs-icon-expand").classList.remove("hidden");
+    $("#fs-icon-collapse").classList.add("hidden");
+    $("#modal-fullscreen").title = "全屏";
+  }
   currentEditingFile = null;
+  currentRawContent = "";
 }
 
 $("#modal-close").addEventListener("click", closeEditor);
 $("#modal-cancel").addEventListener("click", closeEditor);
+
+// ── 全屏切换 ──
+let isFullscreen = false;
+$("#modal-fullscreen").addEventListener("click", () => {
+  isFullscreen = !isFullscreen;
+  $("#modal").classList.toggle("fullscreen", isFullscreen);
+  $("#fs-icon-expand").classList.toggle("hidden", isFullscreen);
+  $("#fs-icon-collapse").classList.toggle("hidden", !isFullscreen);
+  $("#modal-fullscreen").title = isFullscreen ? "退出全屏" : "全屏";
+});
 $("#modal-save").addEventListener("click", async () => {
   if (!currentEditingFile) return;
+  const content = $("#modal-content").value;
   try {
     await api(`/api/drafts/${encodeURIComponent(currentEditingFile)}`, {
       method: "PUT",
-      body: JSON.stringify({ content: $("#modal-content").value }),
+      body: JSON.stringify({ content }),
     });
     toast("已保存", "ok");
     closeEditor();
     loadDrafts();
   } catch (e) { toast("保存失败: " + e.message, "error"); }
+});
+
+// ───────── Discard Dialog ─────────
+let discardTargetFn = null;
+
+function openDiscardDialog(filename) {
+  discardTargetFn = filename;
+  $("#discard-dialog-filename").textContent = "确定要丢弃 「" + filename + "」 吗？此操作不可恢复。";
+  $("#discard-reason").value = "";
+  $("#discard-dialog").classList.remove("hidden");
+  $("#discard-dialog").classList.add("flex");
+}
+
+function closeDiscardDialog() {
+  $("#discard-dialog").classList.add("hidden");
+  $("#discard-dialog").classList.remove("flex");
+  discardTargetFn = null;
+}
+
+$("#discard-cancel").addEventListener("click", closeDiscardDialog);
+$("#discard-confirm").addEventListener("click", async () => {
+  if (!discardTargetFn) return;
+  const reason = $("#discard-reason").value.trim();
+  const url = `/api/drafts/${encodeURIComponent(discardTargetFn)}` + (reason ? `?reason=${encodeURIComponent(reason)}` : "");
+  try {
+    await api(url, { method: "DELETE" });
+    toast(reason ? "已丢弃（原因已记录）" : "已丢弃", "ok");
+    closeDiscardDialog();
+    loadDrafts(); loadStats();
+  } catch (e) { toast("丢弃失败: " + e.message, "error"); }
 });
 
 // ───────── Memories ─────────

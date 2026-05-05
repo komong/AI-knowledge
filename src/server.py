@@ -29,7 +29,7 @@ DRAFTS_DIR = Path(os.getenv(
 ))
 DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
 
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_URL = os.getenv("QDRANT_URL", "")  # 空字符串则走本地文件模式
 
 mcp = FastMCP("knowledge")
 _store: Store | None = None
@@ -38,7 +38,8 @@ _store: Store | None = None
 def get_store() -> Store:
     global _store
     if _store is None:
-        _store = Store(url=QDRANT_URL)
+        # 空字符串视为未设置，Store 会自动使用本地文件模式
+        _store = Store(url=QDRANT_URL if QDRANT_URL else None)
     return _store
 
 
