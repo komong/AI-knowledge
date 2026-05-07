@@ -3,6 +3,7 @@
 提供的工具:
 - search_memory: 检索历史经验（agent 遇到问题时主动调用）
 - draft_memory:  起草一条新经验（agent 解决问题后主动调用，写入草稿池）
+- edit_draft:    修改已有草稿的指定 section（agent 按用户反馈调整草稿）
 - list_drafts:   列出待审核草稿
 - read_draft:    读取某条草稿全文
 - stats:         库存量统计
@@ -128,6 +129,10 @@ status: draft
 
 {problem}
 
+# 一句话总结
+
+_(AI 用通俗语言向非技术人员解释：发生了什么、为什么重要、怎么解决的。1-2 句话即可。)_
+
 # 场景
 
 {context or "_(未填写)_"}
@@ -142,6 +147,84 @@ status: draft
         "status": "drafted",
         "file": str(filepath),
         "next_step": "用户 review 后运行 `python -m scripts.commit` 入库",
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def edit_draft(filename: str, field: str, new_content: str) -> str:
+    """修改已有草稿的指定 section，用于按用户反馈调整草稿内容。
+
+    使用时机: 用户审核草稿后说"这个 solution 写详细点"、"一句话总结不够通俗"等，
+    调用此工具直接修改草稿文件，无需重新起草。
+
+    限制: 只能修改 drafts/ 下的草稿（不能改 _committed/ 已入库文件）。
+
+    Args:
+        filename: 草稿文件名，例如 "20260505-161525_xxx.md"
+        field: 要修改的 section，可选值:
+               "problem"  → # 问题
+               "summary"  → # 一句话总结
+               "context"  → # 场景
+               "solution" → # 解决方案
+        new_content: 新的完整内容，会整体替换原 section 下的所有文字。
+
+    Returns:
+        JSON 字符串，含操作结果。
+    """
+    SECTION_MAP = {
+        "problem": "问题",
+        "summary": "一句话总结",
+        "context": "场景",
+        "solution": "解决方案",
+    }
+    if field not in SECTION_MAP:
+        return json.dumps({
+            "error": f"不支持的 field: {field}，可选: {list(SECTION_MAP.keys())}",
+        }, ensure_ascii=False)
+
+    filepath = DRAFTS_DIR / filename
+    if not filepath.exists() or not filepath.is_file():
+        return json.dumps({"error": f"草稿不存在: {filename}"}, ensure_ascii=False)
+    if DRAFTS_DIR.resolve() not in filepath.resolve().parents:
+        return json.dumps({"error": "非法路径"}, ensure_ascii=False)
+
+    header = f"# {SECTION_MAP[field]}"
+    lines = filepath.read_text(encoding="utf-8").splitlines()
+    new_lines: list[str] = []
+    skip_until_next_h1 = False
+    replaced = False
+
+    for line in lines:
+        stripped = line.strip()
+        is_h1 = stripped.startswith("# ") and not stripped.startswith("## ")
+
+        if is_h1 and SECTION_MAP[field] in stripped:
+            new_lines.append(line)
+            new_lines.append("")
+            new_lines.append(new_content)
+            skip_until_next_h1 = True
+            replaced = True
+            continue
+
+        if skip_until_next_h1:
+            if is_h1:
+                skip_until_next_h1 = False
+                new_lines.append("")
+                new_lines.append(line)
+            continue
+
+        new_lines.append(line)
+
+    if not replaced:
+        return json.dumps({
+            "error": f"草稿中未找到 section: {header}",
+        }, ensure_ascii=False)
+
+    filepath.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return json.dumps({
+        "status": "updated",
+        "file": str(filepath),
+        "field": field,
     }, ensure_ascii=False, indent=2)
 
 

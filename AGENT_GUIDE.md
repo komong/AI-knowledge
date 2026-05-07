@@ -46,6 +46,29 @@
 
 起草后告诉用户："已起草到草稿池，等你 review 后入库。"
 
+### 一句话总结（重要）
+
+草稿模板会自动生成 `# 一句话总结` section，带有一段占位符。
+起草后你必须立刻调用 `edit_draft` 把这个占位符替换为真正的总结：
+
+- 用通俗语言，假设读者是非技术人员
+- 说清三件事：发生了什么、为什么重要、怎么解决的
+- 1-2 句话，不要技术黑话
+
+示例：
+- ✅ "杀毒软件把 Python 的底层文件当病毒拦截了，导致 embedding 功能静默崩溃。加白名单就行。"
+- ❌ "HIPS 拦截 .pyd 导致 exit=-1073741819，需配置信任区并重启火绒进程。"
+
+### 草稿协作调整
+
+如果用户审核后提出修改意见（如"写详细点"、"太技术了看不懂"），用 `edit_draft` 直接修改：
+
+```
+edit_draft(filename="20260505-xxx.md", field="solution", new_content="...")
+```
+
+不要重新调 `draft_memory` 创建新草稿——那会产生重复。两个 agent 可以通过 `edit_draft` 协作维护同一条草稿，用户只认最终的版本质量。
+
 ### 不要做的事
 
 - 不要调用 `commit_memory`（这个工具不存在 —— 入库必须用户审核后命令行执行）
@@ -60,6 +83,7 @@
 |---|---|
 | `search_memory(query, languages?, tags?)` | 遇到问题先查 |
 | `draft_memory(problem, solution, context, languages, tags)` | 解决了值得复用的问题后起草 |
+| `edit_draft(filename, field, new_content)` | 用户要求调整草稿内容时直接修改 |
 | `list_drafts()` | 用户问"还有哪些待审核" |
 | `read_draft(filename)` | 用户问"那条草稿写了啥" |
 | `stats()` | 用户问"知识库多大了" |
